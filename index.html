@@ -233,7 +233,7 @@ footer { padding: 6px 12px; color: var(--muted); font-size: 11px; border-top: 1p
 </main>
 
 <footer>
-  <span>All prices and most small-cap companies are simulated for fun. Not real market data. Not financial advice.</span>
+  <span>All prices are simulated for fun. Not real market data. Not financial advice.</span>
   <span>Progress saves automatically in your browser.</span>
 </footer>
 
@@ -244,14 +244,14 @@ footer { padding: 6px 12px; color: var(--muted); font-size: 11px; border-top: 1p
 "use strict";
 
 // ------------------------------------------------------------------ data
-// Starting prices are rough and the market is simulated. Tickers marked * are made-up companies.
+// Starting prices are rough and the market is simulated.
 const STOCKS = [
-  { sym: "BYTE",  name: "ByteBlox*",        start: 0.12,   vol: 0.018 },
-  { sym: "MOON",  name: "MoonRocket*",      start: 0.34,   vol: 0.016 },
-  { sym: "ZAPP",  name: "Zappit*",          start: 0.78,   vol: 0.014 },
-  { sym: "PIXL",  name: "Pixel Labs*",      start: 1.65,   vol: 0.012 },
-  { sym: "NOVA",  name: "Nova Energy*",     start: 3.40,   vol: 0.011 },
-  { sym: "KRMA",  name: "Karma Coffee*",    start: 7.25,   vol: 0.009 },
+  { sym: "BYTE",  name: "ByteBlox",        start: 0.12,   vol: 0.018 },
+  { sym: "MOON",  name: "MoonRocket",      start: 0.34,   vol: 0.016 },
+  { sym: "ZAPP",  name: "Zappit",          start: 0.78,   vol: 0.014 },
+  { sym: "PIXL",  name: "Pixel Labs",      start: 1.65,   vol: 0.012 },
+  { sym: "NOVA",  name: "Nova Energy",     start: 3.40,   vol: 0.011 },
+  { sym: "KRMA",  name: "Karma Coffee",    start: 7.25,   vol: 0.009 },
   { sym: "F",     name: "Ford",             start: 11,     vol: 0.0055 },
   { sym: "SNAP",  name: "Snap",             start: 12,     vol: 0.0085 },
   { sym: "INTC",  name: "Intel",            start: 22,     vol: 0.0065 },
@@ -601,7 +601,7 @@ function render(fromTick) {
   const k = stockDef(selected);
   const st = S.stocks[selected];
   $("qSym").textContent = k.sym;
-  $("qName").textContent = k.name.replace("*", " (made-up)").toUpperCase();
+  $("qName").textContent = k.name.toUpperCase();
   $("qPx").textContent = "$" + pxStr(st.price);
   const chg = st.price / st.open - 1;
   $("qChg").textContent = pct(chg) + " today";
@@ -663,7 +663,7 @@ function buildWatch() {
     if (t !== tier) { tier = t; const h = document.createElement("tr"); h.innerHTML = `<td colspan="4" class="tier">${t}</td>`; wl.appendChild(h); }
     const tr = document.createElement("tr");
     tr.id = "w-" + k.sym;
-    tr.innerHTML = `<td class="tk">${k.sym} <small>${k.name.replace("*", "")}</small></td><td class="px"></td><td></td><td><canvas class="spark" width="120" height="36"></canvas></td>`;
+    tr.innerHTML = `<td class="tk">${k.sym} <small>${k.name}</small></td><td class="px"></td><td></td><td><canvas class="spark" width="120" height="36"></canvas></td>`;
     tr.onclick = () => select(k.sym);
     wl.appendChild(tr);
   });
