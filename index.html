@@ -246,12 +246,12 @@ footer { padding: 6px 12px; color: var(--muted); font-size: 11px; border-top: 1p
 // ------------------------------------------------------------------ data
 // Starting prices are rough and the market is simulated.
 const STOCKS = [
-  { sym: "BYTE",  name: "ByteBlox",        start: 0.12,   vol: 0.018 },
-  { sym: "MOON",  name: "MoonRocket",      start: 0.34,   vol: 0.016 },
-  { sym: "ZAPP",  name: "Zappit",          start: 0.78,   vol: 0.014 },
-  { sym: "PIXL",  name: "Pixel Labs",      start: 1.65,   vol: 0.012 },
-  { sym: "NOVA",  name: "Nova Energy",     start: 3.40,   vol: 0.011 },
-  { sym: "KRMA",  name: "Karma Coffee",    start: 7.25,   vol: 0.009 },
+  { sym: "BYTE",  name: "ByteBlox",        start: 0.12,   vol: 0.011 },
+  { sym: "MOON",  name: "MoonRocket",      start: 0.34,   vol: 0.010 },
+  { sym: "ZAPP",  name: "Zappit",          start: 0.78,   vol: 0.009 },
+  { sym: "PIXL",  name: "Pixel Labs",      start: 1.65,   vol: 0.008 },
+  { sym: "NOVA",  name: "Nova Energy",     start: 3.40,   vol: 0.0075 },
+  { sym: "KRMA",  name: "Karma Coffee",    start: 7.25,   vol: 0.0065 },
   { sym: "F",     name: "Ford",             start: 11,     vol: 0.0055 },
   { sym: "SNAP",  name: "Snap",             start: 12,     vol: 0.0085 },
   { sym: "INTC",  name: "Intel",            start: 22,     vol: 0.0065 },
@@ -273,13 +273,13 @@ const STOCKS = [
 ];
 
 const UPGRADES = [
-  { id: "scanner",  name: "Market Scanner",     cost: 2,      desc: "Shows each stock's hidden trend: BULL or BEAR." },
-  { id: "fee1",     name: "Fee Cutter I",       cost: 5,      desc: "Trading fee 1% → 0.5%." },
+  { id: "scanner",  name: "Market Scanner",     cost: 1.5,      desc: "Shows each stock's hidden trend: BULL or BEAR." },
+  { id: "fee1",     name: "Fee Cutter I",       cost: 5,      desc: "Trading fee 0.5% → 0.25%." },
   { id: "short",    name: "Short Selling",      cost: 15,     desc: "Bet on a stock going DOWN." },
   { id: "interest", name: "High-Yield Account", cost: 25,     desc: "Idle cash earns a little interest every tick." },
   { id: "margin2",  name: "Margin 2x",          cost: 40,     desc: "Trade with 2x your net worth. Losses hit 2x too." },
   { id: "leak",     name: "Insider Newswire",   cost: 60,     desc: "See headlines a few ticks before prices react." },
-  { id: "fee2",     name: "Fee Cutter II",      cost: 90,     desc: "Trading fee 0.5% → 0.1%.", needs: "fee1" },
+  { id: "fee2",     name: "Fee Cutter II",      cost: 90,     desc: "Trading fee 0.25% → 0.1%.", needs: "fee1" },
   { id: "speed",    name: "Time Warp",          cost: 250,    desc: "Market moves twice as fast." },
   { id: "margin5",  name: "Margin 5x",          cost: 1000,   desc: "Trade with 5x your net worth.", needs: "margin2" },
   { id: "bot",      name: "Trading Bot",        cost: 3000,   desc: "Auto-buys BULL stocks and dumps BEAR ones with spare cash.", needs: "scanner" },
@@ -297,6 +297,7 @@ const BAD = [
 ];
 
 const GOAL = 1_000_000;
+const MILESTONES = [2, 10, 100, 1000, 10000, 100000];
 const SAVE_KEY = "terminal-trader-v2";
 const HIST = 180;
 
@@ -347,22 +348,25 @@ function save() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(S)); } cat
 // ------------------------------------------------------------------ helpers
 function gauss() { let u = 0, v = 0; while (!u) u = Math.random(); while (!v) v = Math.random(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); }
 function rint(a, b) { return a + Math.floor(Math.random() * (b - a + 1)); }
-function randTrend() { return (Math.random() < 0.55 ? 1 : -1) * (0.0006 + Math.random() * 0.0016); }
+function randTrend() { return (Math.random() < 0.58 ? 1 : -1) * (0.001 + Math.random() * 0.0025); }
 function has(id) { return !!S.owned[id]; }
 function stockDef(sym) { return STOCKS.find(k => k.sym === sym); }
 function price(sym) { return S.stocks[sym].price; }
-function feeRate() { return has("fee3") ? 0 : has("fee2") ? 0.001 : has("fee1") ? 0.005 : 0.01; }
+function feeRate() { return has("fee3") ? 0 : has("fee2") ? 0.001 : has("fee1") ? 0.0025 : 0.005; }
 function leverage() { return has("margin10") ? 10 : has("margin5") ? 5 : has("margin2") ? 2 : 1; }
 
 function money(v) {
   const a = Math.abs(v);
   let s;
-  if (a >= 1e6) s = "$" + (a / 1e6).toFixed(2) + "M";
+  if (a >= 1e15) s = "$" + a.toExponential(2);
+  else if (a >= 1e12) s = "$" + (a / 1e12).toFixed(2) + "T";
+  else if (a >= 1e9) s = "$" + (a / 1e9).toFixed(2) + "B";
+  else if (a >= 1e6) s = "$" + (a / 1e6).toFixed(2) + "M";
   else if (a < 1 && a > 0) s = "$" + a.toFixed(a < 0.1 ? 4 : 3);
   else s = "$" + a.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   return (v < 0 ? "-" : "") + s;
 }
-function fullMoney(v) { return (v < 0 ? "-$" : "$") + Math.abs(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+function fullMoney(v) { return Math.abs(v) >= 1e9 ? money(v) : (v < 0 ? "-$" : "$") + Math.abs(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 function pxStr(p) { return p < 1 ? p.toFixed(4) : p < 10 ? p.toFixed(3) : p.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 function pct(v) { return (v >= 0 ? "+" : "") + (v * 100).toFixed(2) + "%"; }
 
@@ -390,19 +394,26 @@ function step() {
   for (const k of STOCKS) {
     const st = S.stocks[k.sym];
     if (--st.trendLeft <= 0) { st.trend = randTrend(); st.trendLeft = rint(40, 140); }
-    let r = st.trend + gauss() * k.vol;
+    let r = st.trend + gauss() * k.vol - 0.0012 * Math.log(st.price / k.start);
     if (st.shock) { const part = st.shock * 0.5; r += part; st.shock -= part; if (Math.abs(st.shock) < 0.001) st.shock = 0; }
-    st.price = Math.max(k.start * 0.03, Math.min(k.start * 40, st.price * Math.exp(r)));
+    st.price = Math.max(k.start * 0.01, st.price * Math.exp(r));
     st.hist.push(st.price);
     if (st.hist.length > HIST) st.hist.shift();
     if (S.tick % 390 === 0) st.open = st.price;
   }
-  if (has("interest") && S.cash > 0) S.cash *= 1.0002;
+  if (has("interest") && S.cash > 0) S.cash *= 1.00005;
   if (S.loan > 0) S.loan *= 1.00005;
   if (has("bot") && S.tick % 5 === 0) runBot();
   checkMargin();
   const nw = netWorth();
   if (nw > S.best) S.best = nw;
+  for (const m of MILESTONES) {
+    if (nw >= m && !(S.milestones || []).includes(m)) {
+      S.milestones = (S.milestones || []).concat(m);
+      addNews("MILESTONE: net worth passed " + money(m) + "!", "amber");
+      toast("Net worth passed " + money(m) + "!");
+    }
+  }
   if (!S.won && nw >= GOAL) { S.won = true; showWin(); }
   if (S.tick % 5 === 0) save();
   render(true);
@@ -837,6 +848,7 @@ $("qtyDown").onclick = () => setQty(readQty() - 1);
 $("qMax").onclick = () => { const m = maxBuy(selected); if (m) setQty(m); else toast("You can't afford 1 share of " + selected); };
 document.querySelectorAll(".quick [data-q]").forEach(b => b.onclick = () => setQty(+b.dataset.q));
 qtyEl.addEventListener("input", updateCost);
+qtyEl.addEventListener("keydown", e => { if (e.key === "Enter") buy(selected, readQty()); });
 $("positions").addEventListener("click", e => { const tr = e.target.closest("tr[data-sym]"); if (tr) select(tr.dataset.sym); });
 $("upgrades").addEventListener("click", e => { const id = e.target.dataset && e.target.dataset.upg; if (id) buyUpgrade(id); });
 $("resetBtn").onclick = () => resetGame(false);
@@ -844,7 +856,7 @@ $("helpBtn").onclick = showHelp;
 $("cmdGo").onclick = () => { runCommand($("cmdInput").value); $("cmdInput").value = ""; };
 $("cmdInput").addEventListener("keydown", e => { if (e.key === "Enter") { runCommand(e.target.value); e.target.value = ""; } });
 document.addEventListener("keydown", e => {
-  if (e.target.tagName === "INPUT") return;
+  if (e.target.tagName === "INPUT" || $("overlay").classList.contains("show")) return;
   const i = STOCKS.findIndex(k => k.sym === selected);
   if (e.key === "ArrowDown") { e.preventDefault(); select(STOCKS[Math.min(STOCKS.length - 1, i + 1)].sym); }
   if (e.key === "ArrowUp") { e.preventDefault(); select(STOCKS[Math.max(0, i - 1)].sym); }
