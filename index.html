@@ -1,0 +1,805 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Terminal Trader</title>
+<meta name="description" content="Start with $1. Trade simulated tech stocks in a retro trading terminal. Buy upgrades. Reach $1,000,000.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #000;
+  --panel: #0a0a0a;
+  --line: #2a2a2a;
+  --amber: #ffa028;
+  --amber-dim: #a8681a;
+  --text: #e8e2d4;
+  --muted: #8a8577;
+  --up: #2ee36b;
+  --down: #ff4b4b;
+  --blue: #4fb3ff;
+  --hl: #1c1408;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text); }
+body { font: 13px/1.4 "IBM Plex Mono", ui-monospace, Consolas, monospace; overflow-x: hidden; }
+button { font: inherit; cursor: pointer; }
+.up { color: var(--up); } .down { color: var(--down); } .amber { color: var(--amber); } .muted { color: var(--muted); }
+
+header { display: flex; flex-wrap: wrap; gap: 6px 22px; align-items: center; padding: 6px 12px; background: var(--amber); color: #000; font-weight: 600; }
+header .brand { font-size: 15px; letter-spacing: 1px; }
+header .stat span { font-weight: 400; margin-right: 4px; }
+header .spacer { flex: 1; }
+header button { background: #000; color: var(--amber); border: 0; padding: 2px 10px; }
+
+.tape { white-space: nowrap; overflow: hidden; border-bottom: 1px solid var(--line); background: #050505; }
+.tape-inner { display: inline-block; padding: 3px 0; animation: tape 40s linear infinite; }
+.tape-inner b { margin: 0 6px 0 22px; color: var(--amber); }
+@keyframes tape { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+
+.cmd { display: flex; align-items: center; gap: 8px; padding: 5px 12px; border-bottom: 1px solid var(--line); }
+.cmd label { color: var(--amber); }
+.cmd input { flex: 1; background: transparent; border: 0; outline: 0; color: var(--text); font: inherit; text-transform: uppercase; }
+.cmd .go { background: var(--amber); color: #000; border: 0; padding: 1px 10px; font-weight: 600; }
+
+main { display: grid; grid-template-columns: 330px 1fr 340px; gap: 1px; background: var(--line); min-height: calc(100vh - 190px); }
+section { background: var(--panel); padding: 8px 10px; min-width: 0; }
+h2 { margin: 0 0 6px; font-size: 12px; color: var(--amber); letter-spacing: 1px; border-bottom: 1px solid var(--line); padding-bottom: 4px; display: flex; justify-content: space-between; }
+h2 small { color: var(--muted); font-weight: 400; }
+
+table { width: 100%; border-collapse: collapse; }
+th { text-align: right; color: var(--muted); font-weight: 400; font-size: 11px; padding: 2px 4px; }
+th:first-child, td:first-child { text-align: left; }
+td { text-align: right; padding: 4px; border-bottom: 1px solid #141414; white-space: nowrap; }
+tr.row { cursor: pointer; }
+tr.row:hover { background: #111; }
+tr.row.sel { background: var(--hl); outline: 1px solid var(--amber-dim); }
+tr.locked td { color: #444; cursor: default; }
+td.tk { color: var(--amber); font-weight: 600; }
+.flash-up { animation: fu .6s; } .flash-down { animation: fd .6s; }
+@keyframes fu { from { background: rgba(46,227,107,.35); } to { background: transparent; } }
+@keyframes fd { from { background: rgba(255,75,75,.35); } to { background: transparent; } }
+canvas.spark { width: 70px; height: 20px; display: block; margin-left: auto; }
+
+.quote { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; margin-bottom: 4px; }
+.quote .sym { font-size: 22px; color: var(--amber); font-weight: 600; }
+.quote .px { font-size: 22px; }
+.quote .chg { font-size: 15px; }
+.signal { font-size: 12px; padding: 1px 6px; border: 1px solid currentColor; }
+#chart { width: 100%; height: 300px; display: block; background: #050505; border: 1px solid var(--line); }
+
+.trade { margin-top: 8px; display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: start; }
+.amount { display: flex; align-items: center; border: 1px solid var(--amber-dim); background: #050505; }
+.amount span { padding: 0 8px; color: var(--amber); }
+.amount input { flex: 1; min-width: 0; background: transparent; border: 0; outline: 0; color: var(--text); font: inherit; font-size: 16px; padding: 6px 0; }
+.quick { display: flex; gap: 4px; margin-top: 6px; flex-wrap: wrap; }
+.quick button { background: #111; color: var(--text); border: 1px solid var(--line); padding: 2px 8px; }
+.quick button:hover { border-color: var(--amber); }
+.actions { display: flex; gap: 6px; }
+.actions button { border: 0; padding: 9px 16px; font-weight: 600; color: #000; min-width: 74px; }
+.buy { background: var(--up); } .sell { background: var(--down); } .short { background: var(--blue); }
+.actions button:disabled { background: #222; color: #555; cursor: not-allowed; }
+.info { margin-top: 6px; color: var(--muted); font-size: 12px; min-height: 18px; }
+
+.news { margin-top: 10px; height: 150px; overflow-y: auto; border-top: 1px solid var(--line); padding-top: 4px; }
+.news div { padding: 2px 0; border-bottom: 1px solid #111; }
+.news .t { color: var(--muted); margin-right: 8px; }
+.news .leak { color: var(--blue); }
+
+.upg { border: 1px solid var(--line); padding: 6px 8px; margin-bottom: 6px; display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; }
+.upg .nm { color: var(--amber); font-weight: 600; }
+.upg .ds { grid-column: 1; color: var(--muted); font-size: 12px; }
+.upg button { grid-row: 1 / span 2; grid-column: 2; align-self: center; background: var(--amber); color: #000; border: 0; padding: 5px 10px; font-weight: 600; }
+.upg button:disabled { background: #222; color: #555; cursor: not-allowed; }
+.upg.owned { opacity: .55; }
+.upg.owned button { background: transparent; color: var(--up); }
+
+footer { padding: 6px 12px; color: var(--muted); font-size: 11px; border-top: 1px solid var(--line); display: flex; justify-content: space-between; flex-wrap: wrap; gap: 6px; }
+
+.overlay { position: fixed; inset: 0; background: rgba(0,0,0,.85); display: none; align-items: center; justify-content: center; z-index: 10; padding: 16px; }
+.overlay.show { display: flex; }
+.box { border: 2px solid var(--amber); background: #050505; padding: 22px 26px; max-width: 460px; text-align: center; }
+.box h1 { color: var(--amber); margin: 0 0 10px; font-size: 22px; letter-spacing: 2px; }
+.box p { margin: 8px 0; }
+.box button { margin-top: 12px; background: var(--amber); color: #000; border: 0; padding: 8px 20px; font-weight: 600; }
+
+.toast { position: fixed; bottom: 40px; left: 50%; transform: translateX(-50%); background: var(--amber); color: #000; padding: 6px 14px; font-weight: 600; opacity: 0; transition: opacity .2s; pointer-events: none; z-index: 11; }
+.toast.show { opacity: 1; }
+
+@media (max-width: 1100px) {
+  main { grid-template-columns: 1fr 1fr; }
+  #centerPanel { grid-column: 1 / -1; order: -1; }
+}
+@media (max-width: 700px) {
+  main { grid-template-columns: 1fr; }
+  #chart { height: 220px; }
+  .trade { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">&#9608; TERMINAL TRADER</div>
+  <div class="stat"><span>NET WORTH</span><b id="hNet">$1.00</b></div>
+  <div class="stat"><span>CASH</span><b id="hCash">$1.00</b></div>
+  <div class="stat"><span>P/L</span><b id="hPl">+0.00%</b></div>
+  <div class="stat"><span>GOAL</span><b>$1,000,000</b></div>
+  <div class="spacer"></div>
+  <div class="stat"><span>DAY</span><b id="hDay">1</b> <b id="hClock">09:30</b></div>
+  <button id="resetBtn" title="Start over">RESET</button>
+</header>
+
+<div class="tape"><div class="tape-inner" id="tape"></div></div>
+
+<div class="cmd">
+  <label for="cmdInput">&gt;</label>
+  <input id="cmdInput" placeholder="type a command: BUY NVDA 5 | SELL AAPL ALL | NVDA | HELP" autocomplete="off" spellcheck="false">
+  <button class="go" id="cmdGo">GO</button>
+</div>
+
+<main>
+  <section>
+    <h2>MARKET <small>click to select · keys 1-7</small></h2>
+    <table>
+      <thead><tr><th>TICKER</th><th>LAST</th><th>CHG%</th><th>TREND</th></tr></thead>
+      <tbody id="watch"></tbody>
+    </table>
+    <h2 style="margin-top:14px">POSITIONS <small id="posCount"></small></h2>
+    <table>
+      <thead><tr><th>TICKER</th><th>SHARES</th><th>VALUE</th><th>P/L</th></tr></thead>
+      <tbody id="positions"></tbody>
+    </table>
+    <div class="info" id="loanInfo"></div>
+  </section>
+
+  <section id="centerPanel">
+    <div class="quote">
+      <span class="sym" id="qSym">NVDA</span>
+      <span class="muted" id="qName"></span>
+      <span class="px" id="qPx"></span>
+      <span class="chg" id="qChg"></span>
+      <span class="signal" id="qSignal" hidden></span>
+    </div>
+    <canvas id="chart"></canvas>
+    <div class="trade">
+      <div>
+        <div class="amount"><span>$</span><input id="amount" type="number" min="0" step="0.01" value="1"></div>
+        <div class="quick">
+          <button data-pct="0.1">10%</button><button data-pct="0.25">25%</button>
+          <button data-pct="0.5">50%</button><button data-pct="1">MAX</button>
+          <button id="sellAll">SELL ALL</button>
+        </div>
+      </div>
+      <div class="actions">
+        <button class="buy" id="buyBtn">BUY</button>
+        <button class="sell" id="sellBtn">SELL</button>
+        <button class="short" id="shortBtn" title="Unlock with the Short Selling upgrade">SHORT</button>
+      </div>
+    </div>
+    <div class="info" id="tradeInfo"></div>
+    <h2 style="margin-top:12px">NEWSWIRE <small>headlines move prices</small></h2>
+    <div class="news" id="news"></div>
+  </section>
+
+  <section>
+    <h2>UPGRADES <small id="upgCount"></small></h2>
+    <div id="upgrades"></div>
+  </section>
+</main>
+
+<footer>
+  <span>All prices are simulated for fun. Not real market data. Not financial advice.</span>
+  <span>Progress saves automatically in your browser.</span>
+</footer>
+
+<div class="overlay" id="overlay"><div class="box" id="overlayBox"></div></div>
+<div class="toast" id="toast"></div>
+
+<script>
+"use strict";
+
+// ------------------------------------------------------------------ data
+const STOCKS = [
+  { sym: "NVDA",  name: "Nvidia",    start: 140, vol: 0.0065, tier: 0 },
+  { sym: "AAPL",  name: "Apple",     start: 230, vol: 0.0040, tier: 0 },
+  { sym: "GOOGL", name: "Alphabet",  start: 175, vol: 0.0048, tier: 0 },
+  { sym: "MSFT",  name: "Microsoft", start: 420, vol: 0.0038, tier: 1 },
+  { sym: "AMZN",  name: "Amazon",    start: 200, vol: 0.0052, tier: 1 },
+  { sym: "TSLA",  name: "Tesla",     start: 250, vol: 0.0095, tier: 2 },
+  { sym: "META",  name: "Meta",      start: 580, vol: 0.0058, tier: 2 },
+];
+
+const UPGRADES = [
+  { id: "scanner",  name: "Market Scanner",     cost: 2,      desc: "Shows each stock's hidden trend: BULL or BEAR." },
+  { id: "fee1",     name: "Fee Cutter I",       cost: 4,      desc: "Trading fee 1% → 0.5%." },
+  { id: "pack1",    name: "Big Tech Pack",      cost: 8,      desc: "Unlocks MSFT and AMZN." },
+  { id: "short",    name: "Short Selling",      cost: 12,     desc: "Bet on a stock going DOWN." },
+  { id: "interest", name: "High-Yield Account", cost: 20,     desc: "Idle cash earns a little interest every tick." },
+  { id: "margin2",  name: "Margin 2x",          cost: 30,     desc: "Trade with 2x your net worth. Losses hit 2x too." },
+  { id: "leak",     name: "Insider Newswire",   cost: 45,     desc: "See headlines a few ticks before prices react." },
+  { id: "fee2",     name: "Fee Cutter II",      cost: 60,     desc: "Trading fee 0.5% → 0.1%.", needs: "fee1" },
+  { id: "pack2",    name: "Volatility Pack",    cost: 100,    desc: "Unlocks TSLA and META. Wild swings.", needs: "pack1" },
+  { id: "speed",    name: "Time Warp",          cost: 200,    desc: "Market moves twice as fast." },
+  { id: "margin5",  name: "Margin 5x",          cost: 750,    desc: "Trade with 5x your net worth.", needs: "margin2" },
+  { id: "bot",      name: "Trading Bot",        cost: 2500,   desc: "Auto-buys BULL stocks and dumps BEAR ones with spare cash.", needs: "scanner" },
+  { id: "fee3",     name: "Zero Fees",          cost: 10000,  desc: "No trading fees at all.", needs: "fee2" },
+  { id: "margin10", name: "Margin 10x",         cost: 50000,  desc: "Trade with 10x your net worth. Live dangerously.", needs: "margin5" },
+];
+
+const GOOD = [
+  "{S} smashes earnings estimates", "{S} unveils a surprise new product", "Analysts upgrade {S} to BUY",
+  "{S} announces a big share buyback", "{S} lands a huge new contract", "Record demand reported for {S}",
+];
+const BAD = [
+  "{S} misses earnings estimates", "Regulators open a probe into {S}", "Analysts downgrade {S} to SELL",
+  "{S} warns of weaker sales ahead", "Key executive leaves {S}", "Supply problems hit {S}",
+];
+
+const GOAL = 1_000_000;
+const SAVE_KEY = "terminal-trader-v1";
+const HIST = 180;
+
+// ------------------------------------------------------------------ state
+let S;
+let selected = "NVDA";
+let timer = null;
+
+function freshState() {
+  const st = {
+    cash: 1, loan: 0, tick: 0, owned: {}, pos: {}, news: [], pending: [],
+    best: 1, won: false, startedAt: Date.now(), stocks: {},
+  };
+  for (const k of STOCKS) {
+    st.stocks[k.sym] = { price: k.start, open: k.start, hist: seedHistory(k), trend: randTrend(), trendLeft: rint(40, 120) };
+    st.pos[k.sym] = { shares: 0, cost: 0 };
+  }
+  return st;
+}
+
+function seedHistory(k) {
+  const h = [];
+  let p = k.start;
+  for (let i = 0; i < HIST; i++) { p *= Math.exp(gauss() * k.vol); h.unshift(p); }
+  h.push(k.start);
+  return h.slice(-HIST);
+}
+
+function load() {
+  try {
+    const raw = localStorage.getItem(SAVE_KEY);
+    if (raw) {
+      const st = JSON.parse(raw);
+      const base = freshState();
+      S = Object.assign(base, st);
+      for (const k of STOCKS) {
+        S.stocks[k.sym] = S.stocks[k.sym] || base.stocks[k.sym];
+        S.pos[k.sym] = S.pos[k.sym] || { shares: 0, cost: 0 };
+      }
+      return;
+    }
+  } catch (e) { /* ignore bad saves */ }
+  S = freshState();
+  addNews("Welcome to Terminal Trader. You have $1.00. Turn it into $1,000,000.", "amber");
+  addNews("Tip: buy the Market Scanner upgrade first. It shows which stocks are trending up.", "amber");
+}
+
+function save() {
+  try { localStorage.setItem(SAVE_KEY, JSON.stringify(S)); } catch (e) { /* storage blocked */ }
+}
+
+// ------------------------------------------------------------------ helpers
+function gauss() { let u = 0, v = 0; while (!u) u = Math.random(); while (!v) v = Math.random(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); }
+function rint(a, b) { return a + Math.floor(Math.random() * (b - a + 1)); }
+function randTrend() { return (Math.random() < 0.55 ? 1 : -1) * (0.0006 + Math.random() * 0.0016); }
+function has(id) { return !!S.owned[id]; }
+function stockDef(sym) { return STOCKS.find(k => k.sym === sym); }
+function unlocked(sym) { const t = stockDef(sym).tier; return t === 0 || (t === 1 && has("pack1")) || (t === 2 && has("pack2")); }
+function price(sym) { return S.stocks[sym].price; }
+function feeRate() { return has("fee3") ? 0 : has("fee2") ? 0.001 : has("fee1") ? 0.005 : 0.01; }
+function leverage() { return has("margin10") ? 10 : has("margin5") ? 5 : has("margin2") ? 2 : 1; }
+
+function money(v) {
+  const a = Math.abs(v);
+  const s = a >= 1e6 ? "$" + (a / 1e6).toFixed(3) + "M" : "$" + a.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return (v < 0 ? "-" : "") + s;
+}
+function pct(v) { return (v >= 0 ? "+" : "") + (v * 100).toFixed(2) + "%"; }
+function shares(n) { const a = Math.abs(n); return (n < 0 ? "-" : "") + (a >= 100 ? a.toFixed(1) : a >= 1 ? a.toFixed(3) : a.toFixed(5)); }
+
+function positionsValue() { let v = 0; for (const k of STOCKS) v += S.pos[k.sym].shares * price(k.sym); return v; }
+function grossExposure() { let v = 0; for (const k of STOCKS) v += Math.abs(S.pos[k.sym].shares * price(k.sym)); return v; }
+function netWorth() { return S.cash + positionsValue() - S.loan; }
+function spendable() {
+  // money available for a buy: cash plus whatever margin lets you borrow
+  return Math.max(0, S.cash) + Math.max(0, netWorth() * (leverage() - 1) - S.loan);
+}
+
+// ------------------------------------------------------------------ market
+function step() {
+  S.tick++;
+  // news: occasionally schedule a headline that moves one stock
+  if (Math.random() < 0.06) scheduleNews();
+  for (const p of S.pending.slice()) {
+    p.delay--;
+    if (p.delay === 2 && has("leak")) addNews("[LEAK] " + p.text, "leak", p.sym);
+    if (p.delay <= 0) {
+      addNews(p.text, p.impact > 0 ? "up" : "down", p.sym);
+      S.stocks[p.sym].shock = (S.stocks[p.sym].shock || 0) + p.impact;
+      S.pending.splice(S.pending.indexOf(p), 1);
+    }
+  }
+  for (const k of STOCKS) {
+    const st = S.stocks[k.sym];
+    if (--st.trendLeft <= 0) { st.trend = randTrend(); st.trendLeft = rint(40, 140); }
+    let r = st.trend + gauss() * k.vol;
+    if (st.shock) { const part = st.shock * 0.5; r += part; st.shock -= part; if (Math.abs(st.shock) < 0.001) st.shock = 0; }
+    st.price = Math.max(0.5, st.price * Math.exp(r));
+    st.hist.push(st.price);
+    if (st.hist.length > HIST) st.hist.shift();
+    if (S.tick % 390 === 0) st.open = st.price; // a new "day"
+  }
+  if (has("interest") && S.cash > 0) S.cash *= 1.0002;
+  if (S.loan > 0) S.loan *= 1.00005; // margin interest
+  if (has("bot") && S.tick % 5 === 0) runBot();
+  checkMargin();
+  const nw = netWorth();
+  if (nw > S.best) S.best = nw;
+  if (!S.won && nw >= GOAL) { S.won = true; showWin(); }
+  if (S.tick % 5 === 0) save();
+  render(true);
+}
+
+function scheduleNews() {
+  const live = STOCKS.filter(k => unlocked(k.sym));
+  const k = live[rint(0, live.length - 1)];
+  const good = Math.random() < 0.5;
+  const pool = good ? GOOD : BAD;
+  const text = pool[rint(0, pool.length - 1)].replace("{S}", k.sym);
+  const impact = (good ? 1 : -1) * (0.03 + Math.random() * 0.09);
+  S.pending.push({ sym: k.sym, text, impact, delay: has("leak") ? 4 : 1 });
+}
+
+function addNews(text, cls, sym) {
+  S.news.unshift({ t: clock(), text, cls: cls || "", sym: sym || "" });
+  if (S.news.length > 60) S.news.pop();
+}
+
+function clock() {
+  const m = 9 * 60 + 30 + (S.tick % 390);
+  return String(Math.floor(m / 60)).padStart(2, "0") + ":" + String(m % 60).padStart(2, "0");
+}
+
+function checkMargin() {
+  const exposure = grossExposure();
+  if (exposure > 0 && netWorth() <= 0.005) {
+    for (const k of STOCKS) { S.pos[k.sym] = { shares: 0, cost: 0 }; }
+    S.cash = 0; S.loan = 0;
+    addNews("MARGIN CALL. Your positions were liquidated.", "down");
+    showBankrupt();
+  } else if (exposure === 0 && netWorth() < 0.01 && !S.bankrupt) {
+    showBankrupt();
+  }
+}
+
+function runBot() {
+  const fr = feeRate();
+  for (const k of STOCKS) {
+    if (!unlocked(k.sym)) continue;
+    const st = S.stocks[k.sym];
+    const pos = S.pos[k.sym];
+    if (st.trend < 0 && pos.shares > 0) closePosition(k.sym, true);
+  }
+  const bulls = STOCKS.filter(k => unlocked(k.sym) && S.stocks[k.sym].trend > 0);
+  if (!bulls.length) return;
+  const budget = Math.max(0, S.cash) * 0.2;
+  if (budget < 1) return;
+  const k = bulls[rint(0, bulls.length - 1)];
+  trade(k.sym, "buy", budget / (1 + fr), true);
+}
+
+// ------------------------------------------------------------------ trading
+function trade(sym, side, dollars, quiet) {
+  if (S.bankrupt) return false;
+  dollars = Math.floor(dollars * 100) / 100;
+  if (!(dollars >= 0.01)) { if (!quiet) toast("Enter an amount of at least $0.01"); return false; }
+  if (!unlocked(sym)) { if (!quiet) toast(sym + " is locked. Buy an upgrade to unlock it."); return false; }
+  const px = price(sym);
+  const pos = S.pos[sym];
+  const fee = dollars * feeRate();
+
+  if (side === "buy") {
+    if (dollars + fee > spendable() + 1e-9) { if (!quiet) toast("Not enough buying power"); return false; }
+    let n = dollars / px;
+    S.cash -= dollars + fee;
+    if (S.cash < 0) { S.loan += -S.cash; S.cash = 0; }
+    if (pos.shares < 0) {
+      // covering a short first
+      const cover = Math.min(n, -pos.shares);
+      pos.shares += cover; n -= cover;
+      if (pos.shares === 0) pos.cost = 0;
+    }
+    if (n > 0) {
+      pos.cost = (pos.cost * pos.shares + n * px) / (pos.shares + n);
+      pos.shares += n;
+    }
+  } else {
+    const held = Math.max(0, pos.shares) * px;
+    const shortPart = Math.max(0, dollars - held);
+    if (shortPart > 0.009) {
+      if (!has("short")) { if (!quiet) toast("You only own " + money(held) + " of " + sym + ". Unlock Short Selling to sell more."); return false; }
+      if (shortPart > Math.max(0, netWorth() * leverage() - grossExposure()) + 1e-9) { if (!quiet) toast("Not enough margin to short that much"); return false; }
+    }
+    let n = dollars / px;
+    if (shortPart <= 0.009) n = Math.min(n, Math.max(0, pos.shares));
+    const sellFromLong = Math.min(n, Math.max(0, pos.shares));
+    const shortN = n - sellFromLong;
+    pos.shares -= sellFromLong;
+    if (shortN > 0) {
+      const curShort = Math.max(0, -pos.shares);
+      pos.cost = (pos.cost * curShort + shortN * px) / (curShort + shortN);
+      pos.shares -= shortN;
+    }
+    if (Math.abs(pos.shares) < 1e-9) { pos.shares = 0; pos.cost = 0; }
+    S.cash += n * px - fee;
+    if (S.loan > 0 && S.cash > 0) { const pay = Math.min(S.loan, S.cash); S.loan -= pay; S.cash -= pay; }
+  }
+  if (!quiet) {
+    const verb = side === "buy" ? "BOUGHT" : (pos.shares < 0 ? "SHORTED/SOLD" : "SOLD");
+    toast(verb + " " + money(dollars) + " of " + sym + (fee > 0 ? "  (fee " + money(fee) + ")" : ""));
+  }
+  save();
+  render(false);
+  return true;
+}
+
+// Close a whole position exactly (no leftover fractions from rounding to cents).
+function closePosition(sym, quiet) {
+  const pos = S.pos[sym];
+  if (!pos.shares) { if (!quiet) toast("You don't hold any " + sym); return false; }
+  const value = Math.abs(pos.shares) * price(sym);
+  const fee = value * feeRate();
+  const wasShort = pos.shares < 0;
+  S.cash += (wasShort ? -value : value) - fee;
+  pos.shares = 0; pos.cost = 0;
+  if (S.cash < 0) { S.loan += -S.cash; S.cash = 0; }
+  if (S.loan > 0 && S.cash > 0) { const pay = Math.min(S.loan, S.cash); S.loan -= pay; S.cash -= pay; }
+  if (!quiet) toast((wasShort ? "COVERED " : "SOLD ") + money(value) + " of " + sym + (fee > 0 ? "  (fee " + money(fee) + ")" : ""));
+  save();
+  render(false);
+  return true;
+}
+
+function buyUpgrade(id) {
+  const u = UPGRADES.find(x => x.id === id);
+  if (!u || has(id) || (u.needs && !has(u.needs))) return;
+  if (S.cash < u.cost) { toast("You need " + money(u.cost) + " in cash"); return; }
+  S.cash -= u.cost;
+  S.owned[id] = true;
+  addNews("UPGRADE: " + u.name + " unlocked.", "amber");
+  if (id === "speed") restartTimer();
+  toast(u.name + " unlocked!");
+  save();
+  render(false);
+}
+
+// ------------------------------------------------------------------ rendering
+const $ = id => document.getElementById(id);
+let lastPrices = {};
+
+function render(fromTick) {
+  const nw = netWorth();
+  $("hNet").textContent = money(nw);
+  $("hCash").textContent = money(S.cash);
+  const pl = nw - 1;
+  $("hPl").textContent = pct(pl);
+  $("hPl").className = pl >= 0 ? "" : "";
+  $("hDay").textContent = Math.floor(S.tick / 390) + 1;
+  $("hClock").textContent = clock();
+
+  // watchlist
+  const wl = $("watch");
+  if (!wl.children.length) buildWatch();
+  STOCKS.forEach((k, i) => {
+    const tr = wl.children[i];
+    const st = S.stocks[k.sym];
+    const ok = unlocked(k.sym);
+    tr.className = "row" + (k.sym === selected ? " sel" : "") + (ok ? "" : " locked");
+    const chg = st.price / st.open - 1;
+    tr.cells[1].textContent = ok ? st.price.toFixed(2) : "LOCKED";
+    tr.cells[2].textContent = ok ? pct(chg) : "";
+    tr.cells[2].className = chg >= 0 ? "up" : "down";
+    if (fromTick && ok && lastPrices[k.sym] !== undefined) {
+      tr.cells[1].classList.remove("flash-up", "flash-down");
+      void tr.cells[1].offsetWidth;
+      tr.cells[1].classList.add(st.price >= lastPrices[k.sym] ? "flash-up" : "flash-down");
+    }
+    lastPrices[k.sym] = st.price;
+    drawSpark(tr.cells[3].firstChild, ok ? st.hist.slice(-40) : [], chg >= 0);
+  });
+
+  // positions
+  const pb = $("positions");
+  pb.innerHTML = "";
+  let count = 0;
+  for (const k of STOCKS) {
+    const p = S.pos[k.sym];
+    if (!p.shares) continue;
+    count++;
+    const px = price(k.sym);
+    const val = p.shares * px;
+    const gain = p.shares > 0 ? (px - p.cost) * p.shares : (p.cost - px) * -p.shares;
+    const tr = document.createElement("tr");
+    tr.className = "row";
+    tr.innerHTML = `<td class="tk">${k.sym}${p.shares < 0 ? " <span class='muted'>SHORT</span>" : ""}</td><td>${shares(p.shares)}</td><td>${money(val)}</td><td class="${gain >= 0 ? "up" : "down"}">${money(gain)}</td>`;
+    tr.onclick = () => select(k.sym);
+    pb.appendChild(tr);
+  }
+  if (!count) pb.innerHTML = `<tr><td colspan="4" class="muted">No positions yet. Pick a stock and hit BUY.</td></tr>`;
+  $("posCount").textContent = count ? count + " open" : "";
+  const lev = leverage();
+  $("loanInfo").textContent = (S.loan > 0 ? "Borrowed on margin: " + money(S.loan) + "  ·  " : "") + "Buying power: " + money(spendable()) + (lev > 1 ? "  ·  " + lev + "x margin" : "");
+
+  // quote + chart
+  const k = stockDef(selected);
+  const st = S.stocks[selected];
+  $("qSym").textContent = k.sym;
+  $("qName").textContent = k.name.toUpperCase();
+  $("qPx").textContent = "$" + st.price.toFixed(2);
+  const chg = st.price / st.open - 1;
+  $("qChg").textContent = pct(chg) + " today";
+  $("qChg").className = "chg " + (chg >= 0 ? "up" : "down");
+  const sig = $("qSignal");
+  if (has("scanner")) {
+    sig.hidden = false;
+    sig.textContent = st.trend > 0 ? "▲ BULL TREND" : "▼ BEAR TREND";
+    sig.className = "signal " + (st.trend > 0 ? "up" : "down");
+  } else sig.hidden = true;
+  drawChart();
+
+  $("shortBtn").disabled = !has("short");
+  const pos = S.pos[selected];
+  $("tradeInfo").textContent =
+    "Fee " + (feeRate() * 100).toFixed(1) + "%  ·  You hold " + shares(pos.shares) + " " + selected +
+    (pos.shares ? " (" + money(pos.shares * st.price) + ")" : "") + "  ·  Best net worth " + money(S.best);
+
+  // news
+  if (!fromTick || S.tick % 1 === 0) {
+    $("news").innerHTML = S.news.map(n => `<div class="${n.cls}"><span class="t">${n.t}</span>${escapeHtml(n.text)}</div>`).join("");
+  }
+
+  // upgrades
+  renderUpgrades();
+
+  // tape
+  if (!fromTick || S.tick % 10 === 0) {
+    const items = STOCKS.filter(k => unlocked(k.sym)).map(k => {
+      const s = S.stocks[k.sym]; const c = s.price / s.open - 1;
+      return `<b>${k.sym}</b>${s.price.toFixed(2)} <span class="${c >= 0 ? "up" : "down"}">${pct(c)}</span>`;
+    }).join("");
+    $("tape").innerHTML = items + items + items + items;
+  }
+}
+
+function escapeHtml(s) { return s.replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c])); }
+
+function buildWatch() {
+  const wl = $("watch");
+  STOCKS.forEach((k, i) => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td class="tk">${i + 1} ${k.sym}</td><td></td><td></td><td><canvas class="spark" width="140" height="40"></canvas></td>`;
+    tr.onclick = () => { if (unlocked(k.sym)) select(k.sym); else toast("Locked. Buy the " + (k.tier === 1 ? "Big Tech Pack" : "Volatility Pack") + " upgrade."); };
+    wl.appendChild(tr);
+  });
+}
+
+function renderUpgrades() {
+  const box = $("upgrades");
+  let ownedCount = 0;
+  const html = UPGRADES.map(u => {
+    const owned = has(u.id);
+    if (owned) ownedCount++;
+    const blocked = u.needs && !has(u.needs);
+    const afford = S.cash >= u.cost;
+    const label = owned ? "OWNED" : money(u.cost);
+    const desc = blocked ? "Requires " + UPGRADES.find(x => x.id === u.needs).name + ". " + u.desc : u.desc;
+    return `<div class="upg${owned ? " owned" : ""}"><div class="nm">${u.name}</div><div class="ds">${desc}</div>` +
+      `<button data-upg="${u.id}" ${owned || blocked || !afford ? "disabled" : ""}>${label}</button></div>`;
+  }).join("");
+  if (box.dataset.html !== html) { box.innerHTML = html; box.dataset.html = html; }
+  $("upgCount").textContent = ownedCount + " / " + UPGRADES.length;
+}
+
+function drawSpark(cv, data, up) {
+  const g = cv.getContext("2d");
+  g.clearRect(0, 0, cv.width, cv.height);
+  if (data.length < 2) return;
+  const lo = Math.min(...data), hi = Math.max(...data), rng = hi - lo || 1;
+  g.strokeStyle = up ? "#2ee36b" : "#ff4b4b";
+  g.lineWidth = 2;
+  g.beginPath();
+  data.forEach((v, i) => {
+    const x = i / (data.length - 1) * cv.width;
+    const y = cv.height - 3 - (v - lo) / rng * (cv.height - 6);
+    i ? g.lineTo(x, y) : g.moveTo(x, y);
+  });
+  g.stroke();
+}
+
+function drawChart() {
+  const cv = $("chart");
+  const dpr = window.devicePixelRatio || 1;
+  const w = cv.clientWidth, h = cv.clientHeight;
+  if (cv.width !== Math.round(w * dpr)) { cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); }
+  const g = cv.getContext("2d");
+  g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  g.clearRect(0, 0, w, h);
+  const data = S.stocks[selected].hist;
+  const lo = Math.min(...data), hi = Math.max(...data), pad = (hi - lo) * 0.1 || 1;
+  const min = lo - pad, max = hi + pad;
+  const L = 8, R = 64, T = 10, B = 18;
+  const X = i => L + i / (data.length - 1) * (w - L - R);
+  const Y = v => T + (1 - (v - min) / (max - min)) * (h - T - B);
+
+  g.font = "11px 'IBM Plex Mono', monospace";
+  g.strokeStyle = "#1d1d1d"; g.fillStyle = "#8a8577"; g.lineWidth = 1;
+  for (let i = 0; i <= 4; i++) {
+    const v = min + (max - min) * i / 4, y = Y(v);
+    g.beginPath(); g.moveTo(L, y); g.lineTo(w - R, y); g.stroke();
+    g.fillText(v.toFixed(2), w - R + 6, y + 4);
+  }
+  const up = data[data.length - 1] >= data[0];
+  const col = up ? "#2ee36b" : "#ff4b4b";
+  const grad = g.createLinearGradient(0, T, 0, h - B);
+  grad.addColorStop(0, up ? "rgba(46,227,107,.22)" : "rgba(255,75,75,.22)");
+  grad.addColorStop(1, "rgba(0,0,0,0)");
+  g.beginPath();
+  data.forEach((v, i) => i ? g.lineTo(X(i), Y(v)) : g.moveTo(X(i), Y(v)));
+  g.lineTo(X(data.length - 1), h - B); g.lineTo(X(0), h - B); g.closePath();
+  g.fillStyle = grad; g.fill();
+  g.beginPath();
+  data.forEach((v, i) => i ? g.lineTo(X(i), Y(v)) : g.moveTo(X(i), Y(v)));
+  g.strokeStyle = col; g.lineWidth = 2; g.stroke();
+
+  // average cost line for an open position
+  const pos = S.pos[selected];
+  if (pos.shares && pos.cost > min && pos.cost < max) {
+    g.setLineDash([4, 4]); g.strokeStyle = "#ffa028"; g.lineWidth = 1;
+    g.beginPath(); g.moveTo(L, Y(pos.cost)); g.lineTo(w - R, Y(pos.cost)); g.stroke(); g.setLineDash([]);
+    g.fillStyle = "#ffa028"; g.fillText("YOUR AVG", L + 4, Y(pos.cost) - 4);
+  }
+  // last price tag
+  const last = data[data.length - 1];
+  g.fillStyle = col;
+  g.fillRect(w - R + 2, Y(last) - 8, R - 4, 16);
+  g.fillStyle = "#000";
+  g.fillText(last.toFixed(2), w - R + 6, Y(last) + 4);
+}
+
+function select(sym) {
+  selected = sym;
+  render(false);
+}
+
+// ------------------------------------------------------------------ overlays
+function overlay(html) { $("overlayBox").innerHTML = html; $("overlay").classList.add("show"); }
+function closeOverlay() { $("overlay").classList.remove("show"); }
+
+function showBankrupt() {
+  S.bankrupt = true;
+  save();
+  overlay(`<h1>BANKRUPT</h1><p>You went broke on day ${Math.floor(S.tick / 390) + 1}.</p>
+    <p class="muted">Best net worth: ${money(S.best)}</p><button onclick="resetGame()">START AGAIN WITH $1</button>`);
+}
+
+function showWin() {
+  const mins = Math.round((Date.now() - S.startedAt) / 60000);
+  save();
+  overlay(`<h1>MILLIONAIRE</h1><p>You turned $1 into ${money(netWorth())}.</p>
+    <p class="muted">Days traded: ${Math.floor(S.tick / 390) + 1} · about ${mins} min of play</p>
+    <button onclick="closeOverlay()">KEEP TRADING</button>`);
+}
+
+function showHelp() {
+  overlay(`<h1>HOW TO PLAY</h1>
+    <p>You start with <b class="amber">$1</b>. Prices move every second.</p>
+    <p>Pick a stock, type a dollar amount, and hit <b class="up">BUY</b>. Sell when it's higher. You can buy tiny fractions of a share.</p>
+    <p>Headlines in the newswire push prices up or down. Spend profits on <b class="amber">UPGRADES</b>: trend scanner, lower fees, more stocks, shorting, margin.</p>
+    <p>Hit <b class="amber">$1,000,000</b> to win. Drop to zero and you're bankrupt.</p>
+    <p class="muted">Commands: BUY NVDA 5 · SELL AAPL ALL · SHORT TSLA 20 · GOOGL · HELP</p>
+    <button onclick="closeOverlay()">START TRADING</button>`);
+}
+
+function resetGame() {
+  if (!S.bankrupt && netWorth() > 1.5 && !confirm("Start over with $1? Your progress will be lost.")) return;
+  localStorage.removeItem(SAVE_KEY);
+  S = freshState();
+  addNews("New game. You have $1.00. Good luck.", "amber");
+  selected = "NVDA";
+  closeOverlay();
+  restartTimer();
+  render(false);
+}
+
+let toastTimer;
+function toast(msg) {
+  const t = $("toast");
+  t.textContent = msg;
+  t.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove("show"), 1800);
+}
+
+// ------------------------------------------------------------------ commands
+function runCommand(raw) {
+  const parts = raw.trim().toUpperCase().split(/\s+/).filter(Boolean);
+  if (!parts.length) return;
+  const [a, b, c] = parts;
+  if (a === "HELP" || a === "?") return showHelp();
+  if (STOCKS.some(k => k.sym === a)) return unlocked(a) ? select(a) : toast(a + " is locked");
+  if ((a === "BUY" || a === "SELL" || a === "SHORT") && b) {
+    if (!STOCKS.some(k => k.sym === b)) return toast("Unknown ticker " + b);
+    let amt;
+    if (a === "SELL" && (c === "ALL" || c === "MAX")) { selected = b; return closePosition(b); }
+    if (c === "ALL" || c === "MAX") {
+      amt = spendable() / (1 + feeRate());
+    } else amt = parseFloat((c || "").replace("$", ""));
+    if (!(amt > 0)) return toast("Add a dollar amount, e.g. " + a + " " + b + " 5");
+    selected = b;
+    if (a === "SHORT") return doShort(amt);
+    return trade(b, a === "BUY" ? "buy" : "sell", amt);
+  }
+  toast("Unknown command. Type HELP.");
+}
+
+function doShort(amt) {
+  if (!has("short")) return toast("Unlock Short Selling first");
+  const held = Math.max(0, S.pos[selected].shares) * price(selected);
+  trade(selected, "sell", held + amt);
+}
+
+// ------------------------------------------------------------------ wiring
+function readAmount() { return parseFloat($("amount").value); }
+
+$("buyBtn").onclick = () => trade(selected, "buy", readAmount());
+$("sellBtn").onclick = () => {
+  const held = Math.max(0, S.pos[selected].shares) * price(selected);
+  if (!has("short") && readAmount() > held && held > 0) return trade(selected, "sell", held);
+  trade(selected, "sell", readAmount());
+};
+$("shortBtn").onclick = () => doShort(readAmount());
+$("sellAll").onclick = () => closePosition(selected);
+document.querySelectorAll(".quick [data-pct]").forEach(b => b.onclick = () => {
+  const f = parseFloat(b.dataset.pct);
+  const v = spendable() / (1 + feeRate()) * f;
+  $("amount").value = (Math.floor(v * 100) / 100).toFixed(2);
+});
+$("upgrades").addEventListener("click", e => { const id = e.target.dataset && e.target.dataset.upg; if (id) buyUpgrade(id); });
+$("resetBtn").onclick = resetGame;
+$("cmdGo").onclick = () => { runCommand($("cmdInput").value); $("cmdInput").value = ""; };
+$("cmdInput").addEventListener("keydown", e => { if (e.key === "Enter") { runCommand(e.target.value); e.target.value = ""; } });
+document.addEventListener("keydown", e => {
+  if (e.target.tagName === "INPUT") return;
+  const n = parseInt(e.key, 10);
+  if (n >= 1 && n <= STOCKS.length && unlocked(STOCKS[n - 1].sym)) select(STOCKS[n - 1].sym);
+  if (e.key === "b" || e.key === "B") $("buyBtn").click();
+  if (e.key === "s" || e.key === "S") $("sellBtn").click();
+  if (e.key === "/") { e.preventDefault(); $("cmdInput").focus(); }
+});
+window.addEventListener("resize", () => drawChart());
+
+function restartTimer() {
+  clearInterval(timer);
+  timer = setInterval(step, has("speed") ? 500 : 1000);
+}
+
+load();
+if (S.bankrupt) showBankrupt();
+else if (S.tick === 0) showHelp();
+render(false);
+restartTimer();
+</script>
+</body>
+</html>
